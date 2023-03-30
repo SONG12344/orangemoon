@@ -1,0 +1,50 @@
+import pandas as pd
+import networkx as nx
+
+# 计算有向(无权、加权)网络的全局效率
+def cal_eff2(G):
+    #print(G)
+    nodes = list(G.nodes())
+    n = len(nodes)
+    s = 0
+    #print(n)
+    for i in range(n):
+        for j in range(n):
+            if nx.has_path(G, nodes[i], nodes[j]) and i!=j:
+                s += 1/nx.shortest_path_length(G, nodes[i], nodes[j], weight='Weight')
+                #print(nodes[i],nodes[j],s)
+                #print(i)
+    av_eff = s/(n*(n-1))
+    return av_eff
+
+# 读入数据
+network = pd.read_csv('c16到21本地居民相交网络_距离.csv')
+nodes = pd.read_excel('16-21本地居民节点核心度.xlsx')
+
+
+# 根据节点表格内的核心度对节点进行排序
+sorted_nodes = nodes.sort_values('核心度', ascending=False)
+youxiao_num = len(sorted_nodes)-1 #有效节点指的是参与网络的节点数
+#print(youxiao_num)
+#print(sorted_nodes)
+
+# 依次移除每个节点及相关的行
+result_df = pd.DataFrame(columns=['逐步失效的节点','游憩效率'])
+for node in sorted_nodes['节点']:
+    print(node)
+    youxiao_num -= 1
+    print(youxiao_num)
+    # 移除包含该节点的行
+    network = network[~((network['Source'] == node) | (network['Target'] == node))]
+    G4 = nx.from_pandas_edgelist(network, 'Source', 'Target', 'Weight', create_using=nx.DiGraph())
+    print(G4)
+    eff = cal_eff2(G4)  # 计算网络效率
+    print(eff)
+    youqixiaolv = eff * len(list(G4.nodes())) * 0.01  # 游憩效率变化度 = 网络效率*（(有效节点数)*0.01的平衡系数）
+    print(youqixiaolv)
+    result_df = result_df.append({
+        '逐步失效的节点': node,
+        '游憩效率': youqixiaolv
+    }, ignore_index=True)
+# 将结果保存到Excel文件中
+result_df.to_excel('16-21本地结构网络冲击到失效韧性.xlsx', index=False)
